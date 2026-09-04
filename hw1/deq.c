@@ -103,7 +103,7 @@ static Data get(Rep r, End e) {
   
   if (r->ht[e]) {
     // The new endpoint has no neighbor beyond it in this direction.
-    r->ht[e]->np[other_end]=0;
+    r->ht[e]->np[e]=0;
   } else {
     // The removed node was the only node in the deque.
     r->ht[other_end]=0;
@@ -125,7 +125,7 @@ static Data get(Rep r, End e) {
 // The deque length is decreased by one. If no match is found, the deque is
 // unchanged and 0 is returned.
 static Data rem(Rep r, End e, Data d) {
-  End other_end = 1 - e; 
+  End other_end = 1 - e; // The opposite end of the deque
 
   // Search from the selected endpoint toward the opposite endpoint.
   for (Node node = r->ht[e]; node; node = node->np[other_end]) {
