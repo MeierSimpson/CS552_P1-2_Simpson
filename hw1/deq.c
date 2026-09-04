@@ -23,10 +23,145 @@ static Rep rep(Deq q) {
   return (Rep)q;
 }
 
-static void put(Rep r, End e, Data d) {}
-static Data ith(Rep r, End e, int i)  { return 0; }
-static Data get(Rep r, End e)         { return 0; }
-static Data rem(Rep r, End e, Data d) { return 0; }
+// Add a data pointer to one end of the deque.
+//
+// Parameters:
+//   r - the deque's internal representation
+//   e - the end where the new node should be added
+//   d - the data pointer to store in the new node
+//
+// The new node becomes the head or tail selected by e, and the deque length
+// is increased by one.
+static void put(Rep r, End e, Data d) {
+  // The new node will become the endpoint selected by e.
+  Node n = malloc(sizeof(*n));
+  if (!n) ERROR("malloc() failed");
+
+  n->data=d;
+  n->np[e]=0;
+
+  End other_end = 1 - e; // The opposite end of the deque
+
+  if (r->ht[e]) {
+    // deck is not empty, link the new node to the existing endpoint
+    n->np[other_end]=r->ht[e];
+    r->ht[e]->np[e]=n;
+  } else {
+    // An empty deque has the same node at both endpoints.
+    n->np[other_end]=0;
+    r->ht[other_end]=n;
+  }
+
+  // Make the new node the selected endpoint and record the insertion.
+  r->ht[e]=n;
+  r->len++;
+}
+
+// Return the data pointer at zero-based index i, counting from end e.
+//
+// Parameters:
+//   r - the deque's internal representation
+//   e - the end from which the index should be counted
+//   i - the zero-based position of the requested node
+//
+// The deque is not modified. An index outside the deque causes an error.
+static Data ith(Rep r, End e, int i)  {
+  if (i < 0 || i >= r->len) ERROR("index out of bounds");
+
+  End other_end = 1 - e; // The opposite end of the deque
+
+  // Follow links away from the selected end until the requested node.
+  for (Node n=r->ht[e]; n; n=n->np[other_end]) {
+    if (i == 0) {
+      return n->data;
+    }
+    i--;
+  }
+
+  // This should be unreachable after the bounds check above.
+  ERROR("index out of bounds");
+  return 0;
+ }
+// Remove and return the data pointer at one end of the deque.
+//
+// Parameters:
+//   r - the deque's internal representation
+//   e - the end from which the node should be removed
+//
+// The deque length is decreased by one. An empty deque causes an error.
+static Data get(Rep r, End e) {
+  if (!r->ht[e]) ERROR("deq is empty");
+
+  End other_end = 1 - e; // The opposite end of the deque
+
+  // Save the node and its data before removing the endpoint node.
+  Node removed_node = r->ht[e];
+  Data d = removed_node->data;
+
+  // Move the selected endpoint toward the opposite end.
+  r->ht[e] = removed_node->np[other_end];
+  
+  if (r->ht[e]) {
+    // The new endpoint has no neighbor beyond it in this direction.
+    r->ht[e]->np[other_end]=0;
+  } else {
+    // The removed node was the only node in the deque.
+    r->ht[other_end]=0;
+  }
+
+  // The deque owns the node structure, but not the data it points to.
+  free(removed_node);
+  r->len--;
+  return d; 
+}
+// Remove and return the first data pointer equal to d, searching from end e.
+//
+// Parameters:
+//   r - the deque's internal representation
+//   e - the end from which the search should begin
+//   d - the data pointer to find and remove
+//
+// If a match is found, its node is removed, freed, and its data is returned.
+// The deque length is decreased by one. If no match is found, the deque is
+// unchanged and 0 is returned.
+static Data rem(Rep r, End e, Data d) {
+  End other_end = 1 - e; 
+
+  // Search from the selected endpoint toward the opposite endpoint.
+  for (Node node = r->ht[e]; node; node = node->np[other_end]) {
+    if (node->data != d) {
+      continue;
+    }
+
+    // Found a node containing the requested data pointer.
+
+    // If the node is at the selected end, remove it using get().
+    if (node == r->ht[e]) {
+      return get(r, e);
+    }
+
+    // If the node is at the opposite end, remove it using get().
+    if (node == r->ht[other_end]) {
+      return get(r, other_end);
+    }
+
+    // The matching node is in the middle of the deque.
+    Node previous_node = node->np[e];
+    Node next_node = node->np[other_end];
+
+    // Connect the nodes on either side of the node being removed.
+    previous_node->np[other_end] = next_node;
+    next_node->np[e] = previous_node;
+
+    Data removed_data = node->data;
+    free(node);
+    r->len--;
+    return removed_data;
+  }
+
+  // No node contains the requested data pointer.
+  return 0;
+}
 
 extern Deq deq_new() {
   Rep r=(Rep)malloc(sizeof(*r));
